@@ -4,8 +4,25 @@
   <form class="js-submit-settings">
     <p class="kintoneplugin-row">
       <label id="plugin_label" class="kintoneplugin-label">{{html:lang.plugin_label}}</label>
-        <input type="file" id="plugin_input" class="kintoneplugin-input-file">
+      <input type="file" id="plugin_input" class="kintoneplugin-input-file">
+      <br>
     </p>
+    <label id="link_label" class="kintoneplugin-label">{{html:lang.link_label}}</label>
+    <div class="kintoneplugin-select">
+      <select id="link_field">
+        <option value="">---</option>
+      </select>
+    </div>
+    <br>
+    <label id="calc_label" class="kintoneplugin-label">{{html:lang.calc_label}}</label>
+    <div class="kintoneplugin-select">
+      <select id="calc_field">
+        <option value="">---</option>
+      </select>
+    </div>
+    <br>
+    </div>
+    <br>
     <p class="kintoneplugin-row">
         <button type="button" id="plugin_cancel" class="kintoneplugin-button-dialog-cancel">{{html:lang.plugin_cancel}}</button>
         <button type="button" id="plugin_ok" class="kintoneplugin-button-dialog-ok">{{html:lang.plugin_ok}}</button>
