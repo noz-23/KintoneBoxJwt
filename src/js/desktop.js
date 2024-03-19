@@ -1,30 +1,35 @@
 /*
-Licensed under the MIT License 
+ * Kintone x Box JWT認証
+ * Copyright (c) 2024 noz-23
+ *  https://github.com/noz-23/
+ * 
+ * Licensed under the MIT License 
+ *
+ *  利用：
+ *   JQuery:
+ *     https://jquery.com/
+ *     https://js.cybozu.com/jquery/3.7.1/jquery.min.js
+ *   
+ *   jsrender:
+ *     https://www.jsviews.com/
+ *     https://js.cybozu.com/jsrender/1.0.13/jsrender.min.js
+ * 
+ *   axios:Promise based HTTP client for the browser
+ *     https://github.com/axios/axios
+ *     https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js
+ *   
+ *   jsrsasign:opensource free pure JavaScript cryptographic library
+ *     https://github.com/kjur/jsrsasign
+ *     https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js
+ * 
+ * History
+ *  2024/02/19 0.0.1 初版とりあえずバージョン
+ *  2024/03/15 0.1.0 フォルダ作成等の基本機能追加
+ */ 
+ 
+ jQuery.noConflict();
 
-Copyright © 2024 noz-23 All Rights Reserved.
-
-Kintone x Box JWT認証
- 利用：
-  JQuery:
-    https://jquery.com/
-    https://js.cybozu.com/jquery/3.7.1/jquery.min.js
-  
-  jsrender:
-    https://www.jsviews.com/
-    https://js.cybozu.com/jsrender/1.0.13/jsrender.min.js
-
-  axios:Promise based HTTP client for the browser
-    https://github.com/axios/axios
-    https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js
-  
-  jsrsasign:opensource free pure JavaScript cryptographic library
-    https://github.com/kjur/jsrsasign
-    https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js
-
-*/ 
-jQuery.noConflict();
-
-(async ($, PLUGIN_ID) => {
+(async ( PLUGIN_ID_) => {
   'use strict';
   // AUTH URLの定数宣言
   const BOX_AUTH_BASE_PATH = "https://api.box.com/oauth2/token";
@@ -34,15 +39,17 @@ jQuery.noConflict();
   // Box ヘッダーベース
   const BoxHeaderBase ={'Authorization':'Bearer ','content-type':'application/json'};
 
+
+
   // 初期化
   const Inital=async ()=>{
     // 設定の読み込み
-    var param =kintone.plugin.app.getConfig(PLUGIN_ID);
+    var param =kintone.plugin.app.getConfig(PLUGIN_ID_);
     // テキストからJSONへ変換
     var configJson=JSON.parse(param.paramJsonFile);
-    //console.log('configJson',configJson);
+    console.log('configJson',configJson);
     BoxHeaderBase.Authorization ='Bearer '+await getBoxAccessToken(configJson);
-    //console.log('Inital BoxHeaderBase',BoxHeaderBase);
+    console.log('Inital BoxHeaderBase',BoxHeaderBase);
   }
   
   /*
@@ -119,6 +126,15 @@ jQuery.noConflict();
   }
 
   /*
+  フォルダの作成
+   引数　：folderName_ フォルダ名, parentFolderId_ 親フォルダID
+   戻り値：フォルダ名
+  */
+   const CreateFolder =async( folderName_,parentFolderId_,)=>{
+    return await axios.post(BOX_API_BASE_PATH+'/folders',{name:folderName_,parent:{id:parentFolderId_}},{headers:BoxHeaderBase}).then((res)=>{return res.data;});
+  }  
+
+  /*
   フォルダ名の変更
    引数　：folderId_ フォルダID, rename_ 新しいフォルダ名
    戻り値：フォルダ名
@@ -147,9 +163,10 @@ jQuery.noConflict();
 
   // Kintone プラグイン  
   const EVENTS =[
-    'app.record.create.show', // 作成表示
-    'app.record.edit.show',   // 編集表示
-    'app.record.index.show',  // 一覧表示
+    //'app.record.create.show', // 作成表示
+    //'app.record.edit.show',   // 編集表示
+    //'app.record.index.show',  // 一覧表示
+    //'app.record.detail.show',  // 詳細表示
     'app.record.create.submit',     // 作成保存
     'app.record.edit.submit',       // 編集保存
     'app.record.index.edit.submit', // 一覧保存
@@ -158,11 +175,54 @@ jQuery.noConflict();
   kintone.events.on(EVENTS, async (events_) =>{
     console.log('plugin events_:%o',events_);
 
+    const config = kintone.plugin.app.getConfig(PLUGIN_ID_);
+    console.log("config:%o",config);
+    // 
+    const paramFieldLink=config['paramFieldLink'];
+    const paramFieldCalc=config['paramFieldCalculate'];
+
     // JWT認証開始
     await Inital();  
 
-    var user =await GetBoxUser();
-    console.log('plugin user :%o',user);
+    //var user =await GetBoxUser();
+    //console.log('plugin user :%o',user);
+
+    var boxUrl =events_.record[paramFieldLink].value;
+    var folderName =events_.record[paramFieldCalc].value;
+
+    var folderId ='';
+    if(boxUrl.includes('\/s\/') ==true)
+    {
+      // 共有リンク
+      var boxLinkPattern   = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/s\/[a-zA-Z0-9+-_]+)$/;
+      var matchLink = boxUrl.match(boxLinkPattern);
+      console.log('matchLink:%o',matchLink);
+
+      var shareLink =matchLink[0];
+      console.log('shareLink:%o',shareLink);
+
+      var folderData =await GetBoxFolderID(shareLink);
+      folderId =folderData.id;
+    }else if(boxUrl.includes('\/folder\/') ==true){
+      if(boxUrl.includes('\?s=') ==true){
+       // 共有リンク あり フォルダURL
+       var boxFolderPattern = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/folder\/)([a-zA-Z0-9+-_]+)\?s=([a-zA-Z0-9+-_]+)$/;
+       var matchFolder =boxUrl.match(boxFolderPattern);
+       console.log('matchFolder:%o',matchFolder);
+       folderId =matchFolder[4];
+      }else{
+       // 共有リンク なし フォルダURL
+       var boxFolderPattern = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/folder\/)([a-zA-Z0-9+-_]+)$/;
+       var matchFolder =boxUrl.match(boxFolderPattern);
+       console.log('matchFolder:%o',matchFolder);  
+       folderId =matchFolder[4];
+      }
+    }
+    console.log('folderId:%o',folderId);
+
+    var createFolderdata =await CreateFolder(folderName, folderId);
+    console.log('createFolderdata:%o',createFolderdata);
+
   });
 
-})(jQuery, kintone.$PLUGIN_ID);
+})(kintone.$PLUGIN_ID);
