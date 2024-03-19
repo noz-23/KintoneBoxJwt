@@ -47,9 +47,9 @@
     var param =kintone.plugin.app.getConfig(PLUGIN_ID_);
     // テキストからJSONへ変換
     var configJson=JSON.parse(param.paramJsonFile);
-    //console.log('configJson',configJson);
+    console.log('configJson',configJson);
     BoxHeaderBase.Authorization ='Bearer '+await getBoxAccessToken(configJson);
-    //console.log('Inital BoxHeaderBase',BoxHeaderBase);
+    console.log('Inital BoxHeaderBase',BoxHeaderBase);
   }
   
   /*
@@ -126,6 +126,15 @@
   }
 
   /*
+  フォルダの作成
+   引数　：folderName_ フォルダ名, parentFolderId_ 親フォルダID
+   戻り値：フォルダ名
+  */
+   const CreateFolder =async( folderName_,parentFolderId_,)=>{
+    return await axios.post(BOX_API_BASE_PATH+'/folders',{name:folderName_,parent:{id:parentFolderId_}},{headers:BoxHeaderBase}).then((res)=>{return res.data;});
+  }  
+
+  /*
   フォルダ名の変更
    引数　：folderId_ フォルダID, rename_ 新しいフォルダ名
    戻り値：フォルダ名
@@ -154,10 +163,10 @@
 
   // Kintone プラグイン  
   const EVENTS =[
-    'app.record.create.show', // 作成表示
-    'app.record.edit.show',   // 編集表示
-    'app.record.index.show',  // 一覧表示
-    'app.record.detail.show',  // 詳細表示
+    //'app.record.create.show', // 作成表示
+    //'app.record.edit.show',   // 編集表示
+    //'app.record.index.show',  // 一覧表示
+    //'app.record.detail.show',  // 詳細表示
     'app.record.create.submit',     // 作成保存
     'app.record.edit.submit',       // 編集保存
     'app.record.index.edit.submit', // 一覧保存
@@ -170,7 +179,7 @@
     console.log("config:%o",config);
     // 
     const paramFieldLink=config['paramFieldLink'];
-    const paramFieldCalc=config['paramFieldCalc'];
+    const paramFieldCalc=config['paramFieldCalculate'];
 
     // JWT認証開始
     await Inital();  
@@ -179,14 +188,40 @@
     //console.log('plugin user :%o',user);
 
     var boxUrl =events_.record[paramFieldLink].value;
+    var folderName =events_.record[paramFieldCalc].value;
 
-    var boxFolderPattern = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/folder\/)([a-zA-Z0-9+-_]+)\?s=([a-zA-Z0-9+-_]+)$/;
-    var matchFolder =boxUrl.match(boxFolderPattern);
-    console.log('matchFolder:%o',matchFolder);
+    var folderId ='';
+    if(boxUrl.includes('\/s\/') ==true)
+    {
+      // 共有リンク
+      var boxLinkPattern   = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/s\/[a-zA-Z0-9+-_]+)$/;
+      var matchLink = boxUrl.match(boxLinkPattern);
+      console.log('matchLink:%o',matchLink);
 
-    var boxLinkPattern   = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/s\/[a-z0-9]+)$/;
-    var matchLink = boxUrl.match(boxLinkPattern);
-    console.log('matchLink:%o',matchLink);
+      var shareLink =matchLink[0];
+      console.log('shareLink:%o',shareLink);
+
+      var folderData =await GetBoxFolderID(shareLink);
+      folderId =folderData.id;
+    }else if(boxUrl.includes('\/folder\/') ==true){
+      if(boxUrl.includes('\?s=') ==true){
+       // 共有リンク あり フォルダURL
+       var boxFolderPattern = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/folder\/)([a-zA-Z0-9+-_]+)\?s=([a-zA-Z0-9+-_]+)$/;
+       var matchFolder =boxUrl.match(boxFolderPattern);
+       console.log('matchFolder:%o',matchFolder);
+       folderId =matchFolder[4];
+      }else{
+       // 共有リンク なし フォルダURL
+       var boxFolderPattern = /^https:\/\/([a-zA-Z0-9+-_]+).box.(com|net)(\/folder\/)([a-zA-Z0-9+-_]+)$/;
+       var matchFolder =boxUrl.match(boxFolderPattern);
+       console.log('matchFolder:%o',matchFolder);  
+       folderId =matchFolder[4];
+      }
+    }
+    console.log('folderId:%o',folderId);
+
+    var createFolderdata =await CreateFolder(folderName, folderId);
+    console.log('createFolderdata:%o',createFolderdata);
 
   });
 
